@@ -1,5 +1,5 @@
 const http = require('http');
-const https = require('');
+const https = require('https');
 
 const PORT = process.env.PORT || 3000;
 const TARGET_HOST = 'editor32-normal-sg.capcutapi.com';
