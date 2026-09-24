@@ -1,12 +1,16 @@
 {
   "name": "capcut-reverse-proxy",
   "version": "1.0.0",
-  "description": "Reverse proxy to bypass CapCut region lock",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "railway": {
+    "build": {
+      "builder": "NIXPACKS"
+    }
   }
 }
