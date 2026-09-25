@@ -1,56 +1,42 @@
 const http = require('http');
-const https = require('https');
+const net = require('net');
 
 const PORT = process.env.PORT || 3000;
-const DEFAULT_API_HOST = 'editor32-normal-sg.capcutapi.com';
 
 const server = http.createServer((req, res) => {
-    // 1. Client se aaya hua original Host header lo
-    let targetHost = req.headers['host'] || DEFAULT_API_HOST;
+  // Standard HTTP requests ke liye (sirf testing)
+  res.writeHead(200);
+  res.end('CapCut Proxy is running. Use CONNECT for HTTPS.');
+});
 
-    // 2. Agar app ne URL Swap kiya hai (Host mein railway.app aa gaya), toh usko default API host par bhejo
-    if (targetHost.includes('railway.app') || targetHost.includes('localhost') || targetHost.includes('127.0.0.1')) {
-        targetHost = DEFAULT_API_HOST;
-    }
+// HTTPS Tunneling Handle Karo (Ye sabse zaroori hai)
+server.on('connect', (req, clientSocket, head) => {
+  const { port, hostname } = new URL(`http://${req.url}`);
+  
+  console.log(`[Tunnel] Connecting to ${hostname}:${port}`);
 
-    console.log(`[+] Routing: ${req.method} https://${targetHost}${req.url}`);
+  const serverSocket = net.connect(port, hostname, () => {
+    // Client ko bolo connection ban gaya
+    clientSocket.write('HTTP/1.1 200 Connection Established\r\n' +
+                       'Proxy-agent: Node-Proxy\r\n' +
+                       '\r\n');
+    
+    // Data exchange shuru karo
+    serverSocket.write(head);
+    serverSocket.pipe(clientSocket);
+    clientSocket.pipe(serverSocket);
+  });
 
-    // 3. Request options setup karo
-    const options = {
-        hostname: targetHost,
-        port: 443,
-        path: req.url,
-        method: req.method,
-        headers: {
-            ...req.headers,
-            host: targetHost // Target server ko uska asli naam dikhao (Bahut Zaroori)
-        }
-    };
-
-    // Proxy headers hata do taaki server ko shak na ho
-    delete options.headers['x-forwarded-host'];
-    delete options.headers['x-forwarded-proto'];
-    delete options.headers['x-forwarded-for'];
-    delete options.headers['x-real-ip'];
-
-    // 4. Target server ko request forward karo
-    const proxyReq = https.request(options, (proxyRes) => {
-        res.writeHead(proxyRes.statusCode, proxyRes.headers);
-        proxyRes.pipe(res, { end: true });
-    });
-
-    proxyReq.on('error', (e) => {
-        console.error(`[Proxy Error] ${targetHost} -> ${e.message}`);
-        if (!res.headersSent) {
-            res.writeHead(502, { 'Content-Type': 'text/plain' });
-        }
-        res.end('Bad Gateway: ' + e.message);
-    });
-
-    // 5. Request body (POST data) pipe karo
-    req.pipe(proxyReq, { end: true });
+  // Error handling
+  serverSocket.on('error', (err) => {
+    console.error(`[Tunnel Error] ${hostname}: ${err.message}`);
+    clientSocket.end();
+  });
+  clientSocket.on('error', (err) => {
+    serverSocket.end();
+  });
 });
 
 server.listen(PORT, () => {
-    console.log(`🚀 Truly Dynamic Proxy LIVE on port ${PORT}`);
+  console.log(`🚀 CapCut HTTPS Tunnel Proxy LIVE on port ${PORT}`);
 });
